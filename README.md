@@ -67,7 +67,7 @@ Add the plugin to your `.babelrc`.  Optionally, add a path to a webpack config f
         "env": {
             "test": {
                 "plugins": [
-                    [ "  babel-plugin-alias-config", { "config": "./configs/webpack.config.test.js" } ]
+                    [ "babel-plugin-alias-config", { "config": "./configs/webpack.config.test.js" } ]
                 ]
             }
         }
