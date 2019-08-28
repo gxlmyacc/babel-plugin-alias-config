@@ -17,7 +17,7 @@ function fileExists(path) {
   }
 }
 
-function getConfigPath(configPaths, findConfig) {
+function getConfigPath(filename, configPaths, findConfig) {
   let conf = null;
 
   // Try all config paths and return for the first found one
@@ -30,7 +30,7 @@ function getConfigPath(configPaths, findConfig) {
     let resolvedConfigPath;
     if (!findConfig) {
       // Get webpack config
-      resolvedConfigPath = resolve(process.cwd(), compiledConfigPath);
+      resolvedConfigPath = resolve(dirname(filename), compiledConfigPath);
     } else {
       resolvedConfigPath = findUp.sync(compiledConfigPath);
     }
@@ -60,6 +60,7 @@ export default function ({ types: t }) {
 
         // Get webpack config
         const confPath = getConfigPath(
+          filename,
           configPaths,
           findConfig
         );
