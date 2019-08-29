@@ -30,9 +30,12 @@ function getConfigPath(filename, configPaths, findConfig) {
     let resolvedConfigPath;
     if (!findConfig) {
       // Get webpack config
-      resolvedConfigPath = resolve(dirname(filename), compiledConfigPath);
+      resolvedConfigPath = resolve(process.cwd(), compiledConfigPath);
     } else {
-      resolvedConfigPath = findUp.sync(compiledConfigPath);
+      resolvedConfigPath = findUp.sync(compiledConfigPath, {
+        cwd: dirname(filename),
+        type: 'file'
+      });
     }
 
     if (resolvedConfigPath && fileExists(resolvedConfigPath)) {
@@ -44,6 +47,8 @@ function getConfigPath(filename, configPaths, findConfig) {
 
   return conf;
 }
+
+const cached = { };
 
 export default function ({ types: t }) {
   return {
@@ -74,74 +79,94 @@ export default function ({ types: t }) {
         // as config, leading to odd errors
         if (filename === resolve(confPath)) return;
 
-        // Require the config
-        let conf = require(confPath);
-
-        // if the object is empty, we might be in a dependency of the config - bail without warning
-        if (!Object.keys(conf).length) {
-          return;
-        }
-
-        // In the case the webpack config is an es6 config, we need to get the default
-        // eslint-disable-next-line
-        if (conf && conf.__esModule && conf.default) {
-          conf = conf.default;
-        }
-
-        // exit if there's no alias config and the config is not an array
-        if (!conf.alias && !(conf.resolve && conf.resolve.alias) && !Array.isArray(conf)) {
-          throw new Error('The resolved config file doesn\'t contain a resolve configuration');
-        }
-
-        // Get the webpack alias config
         let aliasConf;
         let extensionsConf;
 
-        if (Array.isArray(conf)) {
-          // the exported webpack config is an array ...
-          // (i.e., the project is using webpack's multicompile feature) ...
+        let cache = cached[confPath];
+        if (cache) {
+          if (!cache.conf) return;
+          if (cache.error) throw cache.error;
 
-          // reduce the configs to a single alias object
-          aliasConf = conf.reduce((prev, curr) => {
-            const next = Object.assign({}, prev);
-            const alias = curr.alias || (curr.resolve && curr.resolve.alias);
-            if (alias) {
-              Object.assign(next, alias);
-            }
-            return next;
-          }, {});
+          // eslint-disable-next-line
+          aliasConf = cache.aliasConf;
+          // eslint-disable-next-line
+          extensionsConf = cache.extensionsConf;
+        } else {
+          // Require the config
+          let conf = require(confPath);
 
-          // if the object is empty, bail
-          if (!Object.keys(aliasConf).length) {
+          // if the object is empty, we might be in a dependency of the config - bail without warning
+          if (!Object.keys(conf).length) {
             return;
           }
 
-          // reduce the configs to a single extensions array
-          extensionsConf = conf.reduce((prev, curr) => {
-            const next = [].concat(prev);
-            const extensions = curr.extensions || (curr.resolve && curr.resolve.extensions) || [];
-            if (extensions.length) {
-              extensions.forEach(ext => {
-                if (next.indexOf(ext) === -1) {
-                  next.push(ext);
-                }
-              });
-            }
-            return next;
-          }, []);
+          cache = { conf };
+          cached[confPath] = cache;
 
-          if (!extensionsConf.length) {
-            extensionsConf = null;
+          // In the case the webpack config is an es6 config, we need to get the default
+          // eslint-disable-next-line
+          if (conf && conf.__esModule && conf.default) {
+            conf = conf.default;
           }
-        } else {
-          // the exported webpack config is a single object...
 
-          // use it's resolve.alias property
-          aliasConf = conf.alias || (conf.resolve && conf.resolve.alias);
+          // exit if there's no alias config and the config is not an array
+          if (!conf.alias && !(conf.resolve && conf.resolve.alias) && !Array.isArray(conf)) {
+            cache.error = new Error('The resolved config file doesn\'t contain a resolve configuration');
+            throw cache.error;
+          }
 
-          // use it's resolve.extensions property, if available
-          extensionsConf = conf.extensions || (conf.resolve && conf.resolve.extensions) || [];
-          if (!extensionsConf) extensionsConf = null;
+          // Get the webpack alias config
+
+
+          if (Array.isArray(conf)) {
+            // the exported webpack config is an array ...
+            // (i.e., the project is using webpack's multicompile feature) ...
+
+            // reduce the configs to a single alias object
+            aliasConf = conf.reduce((prev, curr) => {
+              const next = Object.assign({}, prev);
+              const alias = curr.alias || (curr.resolve && curr.resolve.alias);
+              if (alias) {
+                Object.assign(next, alias);
+              }
+              return next;
+            }, {});
+
+            // if the object is empty, bail
+            if (!Object.keys(aliasConf).length) {
+              return;
+            }
+
+            // reduce the configs to a single extensions array
+            extensionsConf = conf.reduce((prev, curr) => {
+              const next = [].concat(prev);
+              const extensions = curr.extensions || (curr.resolve && curr.resolve.extensions) || [];
+              if (extensions.length) {
+                extensions.forEach(ext => {
+                  if (next.indexOf(ext) === -1) {
+                    next.push(ext);
+                  }
+                });
+              }
+              return next;
+            }, []);
+
+            if (!extensionsConf.length) {
+              extensionsConf = null;
+            }
+          } else {
+            // the exported webpack config is a single object...
+
+            // use it's resolve.alias property
+            aliasConf = conf.alias || (conf.resolve && conf.resolve.alias);
+
+            // use it's resolve.extensions property, if available
+            extensionsConf = conf.extensions || (conf.resolve && conf.resolve.extensions) || [];
+            if (!extensionsConf) extensionsConf = null;
+          }
+
+          cache.aliasConf = aliasConf;
+          cache.extensionsConf = extensionsConf;
         }
 
         const { callee: { name: calleeName }, arguments: args } = path.node;
