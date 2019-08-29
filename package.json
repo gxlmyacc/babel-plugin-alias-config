@@ -1,9 +1,12 @@
 {
   "name": "babel-plugin-alias-config",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Babel 7 plugin for aliases",
   "repository": "https://github.com/gxlmyacc/babel-plugin-alias-config",
   "main": "lib/index.js",
+  "files": [
+    "lib/index.js"
+  ],
   "scripts": {
     "build": "babel src/index.js -d lib",
     "prepublish": "npm run build"
@@ -13,11 +16,8 @@
     "webpack",
     "alias"
   ],
-  "author": "gxlmyacc",
+  "author": "gxlmyacc <gxl.mymail@163.com>",
   "license": "MIT",
-  "files": [
-    "lib/index.js"
-  ],
   "dependencies": {
     "@babel/helper-plugin-utils": "^7.0.0",
     "babel-types": "^6.26.0",

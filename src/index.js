@@ -1,13 +1,26 @@
 import {
-  join, resolve, relative, isAbsolute, dirname, basename, sep
+  join,
+  resolve,
+  relative,
+  isAbsolute,
+  dirname,
+  basename
 } from 'path';
+import { declare } from '@babel/helper-plugin-utils';
+import { types as t } from '@babel/core';
 import fs from 'fs';
-import { StringLiteral } from 'babel-types';
 import template from 'lodash.template';
 import some from 'lodash.some';
 import findUp from 'find-up';
 
-const DEFAULT_CONFIG_NAMES = ['alias.config.js', 'app.config.js', 'webpack.config.js', 'webpack.config.babel.js'];
+const REQUIRE = 'require';
+
+const DEFAULT_CONFIG_NAMES = [
+  'alias.config.js',
+  'app.config.js',
+  'webpack.config.js',
+  'webpack.config.babel.js'
+];
 
 function fileExists(path) {
   try {
@@ -48,31 +61,41 @@ function getConfigPath(filename, configPaths, findConfig) {
   return conf;
 }
 
-const cached = { };
+const cached = {};
 
-export default function ({ types: t }) {
+export default declare(api => {
+  api.assertVersion(7);
+
   return {
+    name: 'babel-plugin-alias-config',
     visitor: {
-      CallExpression(path, {
-        file: { opts: { filename } },
-        opts: {
-          config: configPath,
-          findConfig: findConfig = false,
-          noOutputExtension = false
-        } = {}
-      }) {
-        const configPaths = configPath ? [configPath, ...DEFAULT_CONFIG_NAMES] : DEFAULT_CONFIG_NAMES;
+      CallExpression(
+        path,
+        {
+          file: {
+            opts: { filename }
+          },
+          opts: {
+            config: configPath,
+            findConfig: findConfig = false,
+            noOutputExtension = false
+          } = {}
+        }
+      ) {
+        const configPaths = configPath
+          ? [configPath, ...DEFAULT_CONFIG_NAMES]
+          : DEFAULT_CONFIG_NAMES;
 
         // Get webpack config
-        const confPath = getConfigPath(
-          filename,
-          configPaths,
-          findConfig
-        );
+        const confPath = getConfigPath(filename, configPaths, findConfig);
 
         // If the config comes back as null, we didn't find it, so throw an exception.
         if (!confPath) {
-          throw new Error(`Cannot find any of these configuration files: ${configPaths.join(', ')}`);
+          throw new Error(
+            `Cannot find any of these configuration files: ${configPaths.join(
+              ', '
+            )}`
+          );
         }
 
         // Because of babel-register, babel is actually run on webpack config files using themselves
@@ -81,6 +104,8 @@ export default function ({ types: t }) {
 
         let aliasConf;
         let extensionsConf;
+        let cwd;
+        let aliases;
 
         let cache = cached[confPath];
         if (cache) {
@@ -91,6 +116,10 @@ export default function ({ types: t }) {
           aliasConf = cache.aliasConf;
           // eslint-disable-next-line
           extensionsConf = cache.extensionsConf;
+          // eslint-disable-next-line
+          cwd = cache.cwd;
+          // eslint-disable-next-line
+          aliases = cache.aliases;
         } else {
           // Require the config
           let conf = require(confPath);
@@ -100,7 +129,9 @@ export default function ({ types: t }) {
             return;
           }
 
-          cache = { conf };
+          cwd = dirname(confPath);
+
+          cache = { conf, cwd };
           cached[confPath] = cache;
 
           // In the case the webpack config is an es6 config, we need to get the default
@@ -110,13 +141,18 @@ export default function ({ types: t }) {
           }
 
           // exit if there's no alias config and the config is not an array
-          if (!conf.alias && !(conf.resolve && conf.resolve.alias) && !Array.isArray(conf)) {
-            cache.error = new Error('The resolved config file doesn\'t contain a resolve configuration');
+          if (
+            !conf.alias
+            && !(conf.resolve && conf.resolve.alias)
+            && !Array.isArray(conf)
+          ) {
+            cache.error = new Error(
+              "The resolved config file doesn't contain a resolve configuration"
+            );
             throw cache.error;
           }
 
           // Get the webpack alias config
-
 
           if (Array.isArray(conf)) {
             // the exported webpack config is an array ...
@@ -140,7 +176,9 @@ export default function ({ types: t }) {
             // reduce the configs to a single extensions array
             extensionsConf = conf.reduce((prev, curr) => {
               const next = [].concat(prev);
-              const extensions = curr.extensions || (curr.resolve && curr.resolve.extensions) || [];
+              const extensions = curr.extensions
+                || (curr.resolve && curr.resolve.extensions)
+                || [];
               if (extensions.length) {
                 extensions.forEach(ext => {
                   if (next.indexOf(ext) === -1) {
@@ -161,92 +199,100 @@ export default function ({ types: t }) {
             aliasConf = conf.alias || (conf.resolve && conf.resolve.alias);
 
             // use it's resolve.extensions property, if available
-            extensionsConf = conf.extensions || (conf.resolve && conf.resolve.extensions) || [];
+            extensionsConf = conf.extensions
+              || (conf.resolve && conf.resolve.extensions)
+              || [];
             if (!extensionsConf) extensionsConf = null;
           }
 
+          aliases = aliasConf ? Object.keys(aliasConf) : [];
+
+          cache.aliases = aliases;
           cache.aliasConf = aliasConf;
           cache.extensionsConf = extensionsConf;
         }
 
-        const { callee: { name: calleeName }, arguments: args } = path.node;
+        const { arguments: nodeArguments } = path.node;
 
-        // Exit if it's not a require statement
-        if (calleeName !== 'require' || !args.length || !t.isStringLiteral(args[0])) {
+        // If not a require statement do nothing
+        if (!t.isIdentifier(path.node.callee, { name: REQUIRE })) {
+          return;
+        }
+
+        // Make sure required value is a string
+        if (
+          nodeArguments.length === 0
+          || !t.isStringLiteral(nodeArguments[0])
+        ) {
           return;
         }
 
         // Get the path of the StringLiteral
-        const [{ value: filePath }] = args;
+        const [{ value: filePath }] = nodeArguments;
 
-        for (const aliasFrom in aliasConf) {
-          // eslint-disable-next-line
-          if (aliasConf.hasOwnProperty(aliasFrom)) {
-            let aliasTo = aliasConf[aliasFrom];
-            const regex = new RegExp(`^${aliasFrom}(\/|$)`);
+        for (const alias of aliases) {
+          let aliasDestination = aliasConf[alias];
+          const regex = new RegExp(`^${alias}(\/|$)`);
 
-            // If the regex matches, replace by the right config
-            if (regex.test(filePath)) {
-              // notModuleRegExp from https://github.com/webpack/enhanced-resolve/blob/master/lib/Resolver.js
-              const notModuleRegExp = /^\.$|^\.[\\\/]|^\.\.$|^\.\.[\/\\]|^\/|^[A-Z]:[\\\/]/i;
-              const isModule = !notModuleRegExp.test(aliasTo);
+          if (regex.test(filePath)) {
+            // notModuleRegExp from https://github.com/webpack/enhanced-resolve/blob/master/lib/Resolver.js
+            const notModuleRegExp = /^\.$|^\.[\\\/]|^\.\.$|^\.\.[\/\\]|^\/|^[A-Z]:[\\\/]/i;
+            const isModule = !notModuleRegExp.test(aliasDestination);
 
-              if (isModule) {
-                path.node.arguments = [StringLiteral(aliasTo)];
-                return;
-              }
-
-              // If the filepath is not absolute, make it absolute
-              if (!isAbsolute(aliasTo)) {
-                aliasTo = join(process.cwd(), aliasTo);
-              }
-              let relativeFilePath = relative(dirname(filename), aliasTo).split(sep).join('/');
-
-              // In case the file path is the root of the alias, need to put a dot to avoid having an absolute path
-              if (relativeFilePath.length === 0) {
-                relativeFilePath = '.';
-              }
-
-              let requiredFilePath = filePath.replace(aliasFrom, relativeFilePath);
-
-              // In the unfortunate case of a file requiring the current directory which is the alias, we need to add
-              // an extra slash
-              if (requiredFilePath === '.') {
-                requiredFilePath = './';
-              }
-
-              // In the case of a file requiring a child directory of the current directory, we need to add a dot slash
-              if (['.', '/'].indexOf(requiredFilePath[0]) === -1) {
-                requiredFilePath = `./${requiredFilePath}`;
-              }
-
-              // In case the extension option is passed
-              if (extensionsConf && !noOutputExtension) {
-                // Get an absolute path to the file
-                const absoluteRequire = join(aliasTo, basename(filePath));
-
-                let extension = null;
-                some(extensionsConf, ext => {
-                  if (!ext) return false;
-
-                  // If the file with this extension exists set it
-                  if (fileExists(absoluteRequire + ext)) {
-                    extension = ext;
-                  }
-
-                  return extension;
-                });
-
-                // Set the extension to the file path, or keep the original one
-                requiredFilePath += extension || '';
-              }
-
-              path.node.arguments = [StringLiteral(requiredFilePath)];
+            if (isModule) {
+              path.node.arguments = [t.StringLiteral(aliasDestination)];
               return;
             }
+
+            // If the filepath is not absolute, make it absolute
+            if (!isAbsolute(aliasDestination)) {
+              aliasDestination = join(cwd, aliasDestination);
+            }
+            let relativeFilePath = relative(
+              dirname(filename),
+              aliasDestination
+            );
+
+            // In case the file path is the root of the alias, need to put a dot to avoid having an absolute path
+            if (relativeFilePath.length === 0) relativeFilePath = '.';
+
+            let requiredFilePath = filePath.replace(alias, relativeFilePath);
+
+            // If the file is requiring the current directory which is the alias, add an extra slash
+            if (requiredFilePath === '.') requiredFilePath = './';
+
+            // In the case of a file requiring a child directory of the current directory, we need to add a dot slash
+            if (['.', '/'].indexOf(requiredFilePath[0]) === -1) {
+              requiredFilePath = `./${requiredFilePath}`;
+            }
+
+            // TODO: should honor enforceExtension and then use extensionConf to make sure extension
+            // In case the extension option is passed
+            if (extensionsConf && !noOutputExtension) {
+              // Get an absolute path to the file
+              const absoluteRequire = join(aliasDestination, basename(filePath));
+
+              let extension = null;
+              some(extensionsConf, ext => {
+                if (!ext) return false;
+
+                // If the file with this extension exists set it
+                if (fileExists(absoluteRequire + ext)) {
+                  extension = ext;
+                }
+
+                return extension;
+              });
+
+              // Set the extension to the file path, or keep the original one
+              requiredFilePath += extension || '';
+            }
+
+            path.node.arguments = [t.StringLiteral(requiredFilePath)];
+            return;
           }
         }
       }
     }
   };
-}
+});
