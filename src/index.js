@@ -82,6 +82,21 @@ export default declare(api => {
           } = {}
         }
       ) {
+        const { arguments: nodeArguments } = path.node;
+
+        // If not a require statement do nothing
+        if (!t.isIdentifier(path.node.callee, { name: REQUIRE })) {
+          return;
+        }
+
+        // Make sure required value is a string
+        if (
+          nodeArguments.length === 0
+          || !t.isStringLiteral(nodeArguments[0])
+        ) {
+          return;
+        }
+
         const configPaths = configPath
           ? [configPath, ...DEFAULT_CONFIG_NAMES]
           : DEFAULT_CONFIG_NAMES;
@@ -210,21 +225,6 @@ export default declare(api => {
           cache.aliases = aliases;
           cache.aliasConf = aliasConf;
           cache.extensionsConf = extensionsConf;
-        }
-
-        const { arguments: nodeArguments } = path.node;
-
-        // If not a require statement do nothing
-        if (!t.isIdentifier(path.node.callee, { name: REQUIRE })) {
-          return;
-        }
-
-        // Make sure required value is a string
-        if (
-          nodeArguments.length === 0
-          || !t.isStringLiteral(nodeArguments[0])
-        ) {
-          return;
         }
 
         // Get the path of the StringLiteral
