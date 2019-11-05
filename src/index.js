@@ -288,7 +288,7 @@ export default declare(api => {
               requiredFilePath += extension || '';
             }
 
-            path.node.arguments = [t.StringLiteral(requiredFilePath)];
+            path.node.arguments = [t.StringLiteral(requiredFilePath.replace(/\\/g, '/'))];
             return;
           }
         }
