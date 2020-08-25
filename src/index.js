@@ -205,7 +205,7 @@ export function resolveAlias(filename, source, { configPath, findConfig, noOutpu
       const isModule = !notModuleRegExp.test(aliasDestination);
 
       if (isModule) {
-        return aliasDestination;
+        return source.replace(alias, aliasDestination);
       }
 
       if (!isAbsolute(aliasDestination)) {
