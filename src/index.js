@@ -64,7 +64,9 @@ function getConfigPath(filename, configPaths, findConfig) {
 
 const cached = {};
 
-export function resolveAlias(filename, source, { configPath, findConfig, noOutputExtension } = {}) {
+export function resolveAlias(filename, source, {
+  configPath, findConfig, noOutputExtension
+} = {}) {
   const configPaths = configPath
     ? [configPath, ...DEFAULT_CONFIG_NAMES]
     : DEFAULT_CONFIG_NAMES;
@@ -73,13 +75,7 @@ export function resolveAlias(filename, source, { configPath, findConfig, noOutpu
   const confPath = getConfigPath(filename, configPaths, findConfig);
 
   // If the config comes back as null, we didn't find it, so throw an exception.
-  if (!confPath) {
-    throw new Error(
-      `Cannot find any of these configuration files: ${configPaths.join(
-        ', '
-      )}`
-    );
-  }
+  if (!confPath) return;
 
   // Because of babel-register, babel is actually run on webpack config files using themselves
   // as config, leading to odd errors
@@ -96,13 +92,13 @@ export function resolveAlias(filename, source, { configPath, findConfig, noOutpu
     if (cache.error) throw cache.error;
 
     // eslint-disable-next-line
-  aliasConf = cache.aliasConf;
+    aliasConf = cache.aliasConf;
     // eslint-disable-next-line
-  extensionsConf = cache.extensionsConf;
+    extensionsConf = cache.extensionsConf;
     // eslint-disable-next-line
-  cwd = cache.cwd;
+    cwd = cache.cwd;
     // eslint-disable-next-line
-  aliases = cache.aliases;
+    aliases = cache.aliases;
   } else {
   // Require the config
     let conf = require(confPath);
@@ -119,28 +115,14 @@ export function resolveAlias(filename, source, { configPath, findConfig, noOutpu
 
     // In the case the webpack config is an es6 config, we need to get the default
     // eslint-disable-next-line
-  if (conf && conf.__esModule && conf.default) {
+    if (conf && conf.__esModule && conf.default) {
       conf = conf.default;
     }
 
-    // exit if there's no alias config and the config is not an array
-    if (
-      !conf.alias
-    && !(conf.resolve && conf.resolve.alias)
-    && !Array.isArray(conf)
-    ) {
-      cache.error = new Error(
-        "The resolved config file doesn't contain a resolve configuration"
-      );
-      throw cache.error;
-    }
-
     // Get the webpack alias config
-
     if (Array.isArray(conf)) {
-    // the exported webpack config is an array ...
-    // (i.e., the project is using webpack's multicompile feature) ...
-
+      // the exported webpack config is an array ...
+      // (i.e., the project is using webpack's multicompile feature) ...
       // reduce the configs to a single alias object
       aliasConf = conf.reduce((prev, curr) => {
         const next = Object.assign({}, prev);
@@ -150,11 +132,6 @@ export function resolveAlias(filename, source, { configPath, findConfig, noOutpu
         }
         return next;
       }, {});
-
-      // if the object is empty, bail
-      if (!Object.keys(aliasConf).length) {
-        return;
-      }
 
       // reduce the configs to a single extensions array
       extensionsConf = conf.reduce((prev, curr) => {
@@ -176,7 +153,7 @@ export function resolveAlias(filename, source, { configPath, findConfig, noOutpu
         extensionsConf = null;
       }
     } else {
-    // the exported webpack config is a single object...
+      // the exported webpack config is a single object...
 
       // use it's resolve.alias property
       aliasConf = conf.alias || (conf.resolve && conf.resolve.alias);
@@ -195,9 +172,11 @@ export function resolveAlias(filename, source, { configPath, findConfig, noOutpu
     cache.extensionsConf = extensionsConf;
   }
 
-  for (const alias of aliases) {
+  for (let alias of aliases) {
     let aliasDestination = aliasConf[alias];
-    const regex = new RegExp(`^${escapeStringRegexp(alias)}(\/|$)`);
+    const isFull = /\$$/.test(alias);
+    if (isFull) alias = alias.substr(0, alias.length - 1);
+    const regex = new RegExp(`^${escapeStringRegexp(alias)}${isFull ? '$' : '(\/|$)'}`);
 
     if (regex.test(source)) {
     // notModuleRegExp from https://github.com/webpack/enhanced-resolve/blob/master/lib/Resolver.js
@@ -292,7 +271,9 @@ export default declare(api => {
         }
 
         const [{ value: filePath }] = nodeArguments;
-        const newFilename = resolveAlias(filename, filePath, { configPath, findConfig, noOutputExtension });
+        const newFilename = resolveAlias(filename, filePath, {
+          configPath, findConfig, noOutputExtension
+        });
         if (newFilename) path.node.arguments = [t.StringLiteral(newFilename)];
       }
     }
