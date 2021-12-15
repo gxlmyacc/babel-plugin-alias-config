@@ -50,7 +50,7 @@ Transpiles to:
     $ npm install --save-dev babel-plugin-alias-config
 ```
 
-Add the plugin to your `.babelrc`.  Optionally, add a path to a webpack config file, otherwise the plugin will look for `webpack.config.js` or `alias.config.js` or `app.config.js` in the root where the build was run.  Setting the config option will transform all alias destinations to be relative to the custom config.
+Add the plugin to your `.babelrc`.  Optionally, add a path to a webpack config file, otherwise the plugin will look for `alias.config.js` or `app.config.js` or `tsconfig.json` or `jsconfig.json` or `webpack.config.js` in the root where the build was run.  Setting the config option will transform all alias destinations to be relative to the custom config.
 
 ```json
     {
