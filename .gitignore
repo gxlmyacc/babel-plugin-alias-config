@@ -1,5 +1,6 @@
 .DS_Store
 .idea
+.history
 node_modules
 lib
 coverage

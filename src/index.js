@@ -13,12 +13,15 @@ import template from 'lodash.template';
 import some from 'lodash.some';
 import findUp from 'find-up';
 import escapeStringRegexp from 'escape-string-regexp';
+import requireJSON5 from 'require-json5';
 
 const REQUIRE = 'require';
 
 const DEFAULT_CONFIG_NAMES = [
   'alias.config.js',
   'app.config.js',
+  'tsconfig.json',
+  'jsconfig.json',
   'webpack.config.js',
   'webpack.config.babel.js'
 ];
@@ -81,6 +84,7 @@ export function resolveAlias(filename, source, {
   // as config, leading to odd errors
   if (filename === resolve(confPath)) return;
 
+  const isTsconfig = /[jt]sconfig.json$/.test(confPath);
   let aliasConf;
   let extensionsConf;
   let cwd;
@@ -101,7 +105,7 @@ export function resolveAlias(filename, source, {
     aliases = cache.aliases;
   } else {
   // Require the config
-    let conf = require(confPath);
+    let conf = isTsconfig ? requireJSON5(confPath) : require(confPath);
 
     // if the object is empty, we might be in a dependency of the config - bail without warning
     if (!Object.keys(conf).length) {
@@ -119,8 +123,27 @@ export function resolveAlias(filename, source, {
       conf = conf.default;
     }
 
-    // Get the webpack alias config
-    if (Array.isArray(conf)) {
+
+    if (isTsconfig) {
+      aliasConf = conf.compilerOptions && conf.compilerOptions.paths;
+      const baseUrl = (conf.compilerOptions && conf.compilerOptions.baseUrl) || '.';
+      if (aliasConf) {
+        const tsconfigRegx = /(.+)(\/\*)$/;
+        aliasConf = Object.keys(aliasConf).reduce((p, key) => {
+          const [, name, nameSuffix] = key.match(tsconfigRegx) || [];
+          if (!name) return p;
+
+          let aliasValue = aliasConf[key];
+          if (Array.isArray(aliasValue)) aliasValue = aliasValue[0] || '';
+
+          const [, value = '', valueSuffix = ''] = aliasValue.match(tsconfigRegx) || [];
+          p[`${name}${nameSuffix && valueSuffix ? '' : '$'}`] = resolve(cwd, baseUrl, value);
+
+          return p;
+        }, {});
+      }
+      cache.extensionsConf = null;
+    } else if (Array.isArray(conf)) { // Get the webpack alias config
       // the exported webpack config is an array ...
       // (i.e., the project is using webpack's multicompile feature) ...
       // reduce the configs to a single alias object
