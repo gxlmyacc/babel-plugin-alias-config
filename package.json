@@ -1,6 +1,6 @@
 {
   "name": "babel-plugin-alias-config",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "description": "Babel 7 plugin for aliases",
   "repository": "https://github.com/gxlmyacc/babel-plugin-alias-config",
   "main": "lib/index.js",
@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "build": "babel src/index.js -d lib",
-    "prepublish": "npm run build"
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "babel",
@@ -21,6 +21,7 @@
   "dependencies": {
     "@babel/helper-plugin-utils": "^7.0.0",
     "babel-types": "^6.26.0",
+    "core-js": "^2",
     "escape-string-regexp": "^2.0.0",
     "find-up": "^4.1.0",
     "lodash.some": "^4.6.0",

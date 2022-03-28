@@ -128,7 +128,7 @@ export function resolveAlias(filename, source, {
       aliasConf = conf.compilerOptions && conf.compilerOptions.paths;
       const baseUrl = (conf.compilerOptions && conf.compilerOptions.baseUrl) || '.';
       if (aliasConf) {
-        const tsconfigRegx = /(.+)(\/\*)$/;
+        const tsconfigRegx = /(.*[^/*])(\/\*)?$/;
         aliasConf = Object.keys(aliasConf).reduce((p, key) => {
           const [, name, nameSuffix] = key.match(tsconfigRegx) || [];
           if (!name) return p;
