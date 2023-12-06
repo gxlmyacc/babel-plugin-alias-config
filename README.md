@@ -78,3 +78,49 @@ In this example, the plugin will only be run when `NODE_ENV` is set to `test`.
 ## Notes
 
 - If using this plugin with [require-extension-hooks](https://github.com/jackmellis/require-extension-hooks) you'll need to add your webpack file to _hooks'_ [excludePattern](https://github.com/jackmellis/require-extension-hooks#excludepattern--fn) - otherwise the webpack config will always be required as empty.
+
+## options
+
+###  config
+
+default: ''
+
+alias config file to use
+
+### findConfig
+
+default: false
+
+When the `config` option is not set, you can set `findConfig` to `true`, then plugin will automatically search up the nearest alias configuration file from the current compiled file path. The search rule is to search for files with names such as `alias.config.js`, `app. config.js`,`tsconfig.json`, `jsconfig.json`, `webpack.config.js`, or `webpack.config.babel.js`. If found, read the alias configuration information from this file.
+
+### noOutputExtension
+
+default: false
+
+Does the converted file path include an extension
+
+### dynamicImport
+
+default: true
+
+whether to handle the dynamic loading syntax of import() in webpack
+
+
+## demo
+
+### alias.config.js
+
+```js
+const path = require('path');
+
+module.exports = {
+  alias: {
+    '@': path.resolve(__dirname, 'src'),
+    '~': path.resolve(__dirname, 'src/packages/_base'),
+    '^': path.resolve(__dirname, 'src/packages'),
+    '^^': path.resolve(__dirname, 'src'),
+  },
+  extensions: ['.css', '.scss', '.less', '.js', '.json', '.jsx'],
+};
+
+```

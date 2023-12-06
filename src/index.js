@@ -1,19 +1,19 @@
-import {
+const {
   join,
   resolve,
   relative,
   isAbsolute,
   dirname,
   basename
-} from 'path';
-import { declare } from '@babel/helper-plugin-utils';
-import { types as t } from '@babel/core';
-import fs from 'fs';
-import template from 'lodash.template';
-import some from 'lodash.some';
-import findUp from 'find-up';
-import escapeStringRegexp from 'escape-string-regexp';
-import requireJSON5 from 'require-json5';
+} = require('path');
+const { declare } = require('@babel/helper-plugin-utils');
+const { types: t } = require('@babel/core');
+const fs = require('fs');
+const template = require('lodash.template');
+const some = require('lodash.some');
+const findUp = require('find-up');
+const escapeStringRegexp = require('escape-string-regexp');
+const requireJSON5 = require('require-json5');
 
 const REQUIRE = 'require';
 
@@ -60,15 +60,28 @@ function getConfigPath(filename, configPaths, findConfig) {
     }
 
     return conf;
-  });
+  }, false);
 
   return conf;
 }
 
 const cached = {};
 
-export function resolveAlias(filename, source, {
-  configPath, findConfig, noOutputExtension
+/**
+ *
+ * @param {string} filename
+ * @param {string} source
+ * @param {{
+ *   configPath?: string,
+ *   findConfig?: boolean,
+ *   noOutputExtension?: boolean,
+ * }} options
+ * @returns
+ */
+function resolveAlias(filename, source, {
+  configPath = '',
+  findConfig = false,
+  noOutputExtension = false
 } = {}) {
   const configPaths = configPath
     ? [configPath, ...DEFAULT_CONFIG_NAMES]
@@ -248,7 +261,7 @@ export function resolveAlias(filename, source, {
           }
 
           return extension;
-        });
+        }, false);
 
         // Set the extension to the file path, or keep the original one
         requiredFilePath += extension || '';
@@ -259,12 +272,28 @@ export function resolveAlias(filename, source, {
   }
 }
 
-export default declare(api => {
+const plugin = declare(api => {
   api.assertVersion(7);
 
   return {
     name: 'babel-plugin-alias-config',
     visitor: {
+      ImportDeclaration(path, state) {
+        const {
+          filename, opts: {
+            config: configPath = '',
+            findConfig: findConfig = false,
+            noOutputExtension = false
+          } = {}
+        } = state;
+        const { node } = path;
+
+        const filePath = node.source.value;
+        const newFilename = resolveAlias(filename, filePath, {
+          configPath, findConfig, noOutputExtension
+        });
+        if (newFilename) node.source = t.StringLiteral(newFilename);
+      },
       CallExpression(
         path,
         {
@@ -272,33 +301,36 @@ export default declare(api => {
             opts: { filename }
           },
           opts: {
-            config: configPath,
+            config: configPath = '',
             findConfig: findConfig = false,
-            noOutputExtension = false
+            noOutputExtension = false,
+            dynamicImport = true
           } = {}
         }
       ) {
         const { arguments: nodeArguments } = path.node;
 
         // If not a require statement do nothing
-        if (!t.isIdentifier(path.node.callee, { name: REQUIRE })) {
-          return;
-        }
-
-        // Make sure required value is a string
-        if (
-          nodeArguments.length === 0
+        if (t.isIdentifier(path.node.callee, { name: REQUIRE })
+         || (dynamicImport && path.node.callee.type === 'Import')) {
+          // Make sure required value is a string
+          if (
+            nodeArguments.length === 0
           || !t.isStringLiteral(nodeArguments[0])
-        ) {
-          return;
-        }
+          ) {
+            return;
+          }
 
-        const [{ value: filePath }] = nodeArguments;
-        const newFilename = resolveAlias(filename, filePath, {
-          configPath, findConfig, noOutputExtension
-        });
-        if (newFilename) path.node.arguments = [t.StringLiteral(newFilename)];
+          const [{ value: filePath }] = nodeArguments;
+          const newFilename = resolveAlias(filename, filePath, {
+            configPath, findConfig, noOutputExtension
+          });
+          if (newFilename) path.node.arguments = [t.StringLiteral(newFilename)];
+        }
       }
     }
   };
 });
+
+module.exports = plugin;
+module.exports.resolveAlias = resolveAlias;

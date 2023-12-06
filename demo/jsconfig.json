@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "checkJs": true,
+    "experimentalDecorators": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+    },
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "removeComments": false
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "types",
+    "demo",
+    "esm",
+    "es",
+    "build"
+  ]
+}
