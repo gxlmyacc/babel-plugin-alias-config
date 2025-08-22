@@ -148,7 +148,7 @@ const module = await import('@components/Modal');
 |------|------|--------|------|
 | `config` | string | `''` | 指定别名配置文件的路径 |
 | `findConfig` | boolean | `false` | 是否自动从当前编译文件位置向上查找最近的别名配置文件以应用别名。|
-| `noOutputExtension` | boolean | `false` | 转换后的文件路径是否包含扩展名 |
+| `noOutputExtension` | boolean | `false` | 转换后的文件路径是否包含扩展名，这在转义前后的扩展名不相同时可能会用到（比如`.ts` -> `.js`）|
 | `dynamicImport` | boolean | `true` | 是否处理 webpack 中的动态导入语法 |
 
 注：

@@ -149,7 +149,7 @@ const module = await import('@components/Modal');
 |--------|------|---------|-------------|
 | `config` | string | `''` | Path to the alias configuration file |
 | `findConfig` | boolean | `false` | Whether to automatically search upward from the current compiled file location to find the nearest alias configuration file to apply aliases |
-| `noOutputExtension` | boolean | `false` | Whether the converted file path includes an extension |
+| `noOutputExtension` | boolean | `false` | Whether the converted file path includes an extension. This can be useful when the extension changes during transformation (e.g., from `.ts` to `.js`). |
 | `dynamicImport` | boolean | `true` | Whether to handle webpack's dynamic import syntax |
 
 ### Advanced Configuration Examples
