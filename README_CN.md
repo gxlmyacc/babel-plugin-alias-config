@@ -153,6 +153,7 @@ const module = await import('@components/Modal');
 
 注：
 一个项目中可以有多个别名配置文件，比如：
+```
 src/
 ├── packages/
 │   ├── project1/
@@ -169,6 +170,7 @@ src/
 │       └── jsconfig.json
 ├── alias.config.js
 ├── jsconfig.json
+```
 
 可以通过不同目录创建不同的别名配置文件来达到在一个构建项目中实现类似monorepo项目管理的功能。
 
